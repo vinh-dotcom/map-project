@@ -1,0 +1,89 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2487.7">
+  <style type="text/css">
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Times; -webkit-text-stroke: #000000}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Times; -webkit-text-stroke: #000000; min-height: 14.0px}
+    span.s1 {font-kerning: none}
+  </style>
+</head>
+<body>
+<p class="p1"><span class="s1">&lt;!doctype html&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;div class="max-w-6xl mx-auto p-4"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div class="flex gap-4"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;!-- Left: Auth + Form + List --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div class="w-96 bg-white rounded shadow p-4"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;h2 class="text-xl font-semibold mb-2"&gt;Map Markers&lt;/h2&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- Auth UI --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div id="auth-panel" class="mb-4"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div id="signed-out"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;input id="email" placeholder="Email" class="w-full border px-2 py-1 mb-2" /&gt;</span></p>
+<p class="p1"><span class="s1">&lt;input id="password" type="password" placeholder="Password" class="w-full border px-2 py-1 mb-2" /&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div class="flex gap-2"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;button id="btn-signup" class="bg-blue-600 text-white px-3 py-1 rounded"&gt;Đăng ký&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1">&lt;button id="btn-login" class="bg-green-600 text-white px-3 py-1 rounded"&gt;Đăng nhập&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;div id="signed-in" class="hidden"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div&gt;Xin chào: &lt;span id="user-email" class="font-medium"&gt;&lt;/span&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div class="mt-2"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;button id="btn-logout" class="bg-red-500 text-white px-3 py-1 rounded"&gt;Đăng xuất&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- Form thêm marker --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div id="marker-form" class="mb-4 hidden"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;h3 class="font-medium"&gt;Thêm marker&lt;/h3&gt;</span></p>
+<p class="p1"><span class="s1">&lt;input id="m-name" placeholder="Tên địa điểm" class="w-full border px-2 py-1 mb-2" /&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div class="flex gap-2 mb-2"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;input id="m-lat" placeholder="Vĩ độ (lat)" class="flex-1 border px-2 py-1" /&gt;</span></p>
+<p class="p1"><span class="s1">&lt;input id="m-lng" placeholder="Kinh độ (lng)" class="flex-1 border px-2 py-1" /&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;textarea id="m-notes" placeholder="Ghi chú" class="w-full border px-2 py-1 mb-2"&gt;&lt;/textarea&gt;</span></p>
+<p class="p1"><span class="s1">&lt;input id="m-image" type="file" accept="image/*" class="mb-2" /&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div class="flex gap-2"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;button id="btn-add-marker" class="bg-blue-600 text-white px-3 py-1 rounded"&gt;Thêm&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1">&lt;button id="btn-geolocate" class="bg-slate-500 text-white px-3 py-1 rounded"&gt;Dùng vị trí hiện tại&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- Danh sách marker --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div class="mt-4"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;h3 class="font-medium mb-2"&gt;Danh sách điểm của bạn&lt;/h3&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div id="markers-list" class="sidebar"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- Right: Map --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div class="flex-1 bg-white rounded shadow p-4"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div id="map" class="rounded"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;div class="mt-4 text-sm text-gray-600"&gt;Ghi chú: Ứng dụng dùng OpenStreetMap (miễn phí). Hình ảnh được lưu trong Supabase Storage (bucket &lt;code&gt;marker-images&lt;/code&gt;).&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- Leaflet JS --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;script src="https://unpkg.com/leaflet/dist/leaflet.js"&gt;&lt;/script&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- Supabase JS (v2) --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"&gt;&lt;/script&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- Project scripts --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;script src="supabase.js"&gt;&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;script src="auth.js"&gt;&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;script src="upload.js"&gt;&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;script src="app.js"&gt;&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/body&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/html&gt;</span></p>
+</body>
+</html>
