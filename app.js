@@ -1,213 +1,319 @@
-// app.debug.js (replace app.js with this temporarily)
+// =========================
+//  INIT SUPABASE CLIENT
+// =========================
+const SUPABASE_URL = "https://nhzkktsnsaclwwchzdkc.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR_ANON_KEY_HERE";
+window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, storage: window.localStorage }
+});
 
+// =========================
+//  GLOBAL
+// =========================
 let map;
-let markersLayer = L.layerGroup();
-let markersById = {};
+let markersOnMap = {};
+let currentUser = null;
+let isAdmin = false;
 
+// =========================
+//  INIT APP
+// =========================
+document.addEventListener("DOMContentLoaded", async () => {
+  await checkLoginState();
+});
+
+// =========================
+//  CHECK LOGIN + LOAD MAP
+// =========================
+async function checkLoginState() {
+  const { data } = await supabase.auth.getSession();
+  currentUser = data.session?.user || null;
+
+  if (!currentUser) {
+    document.getElementById("auth-view").classList.remove("hidden");
+    document.getElementById("app-view").classList.add("hidden");
+    return;
+  }
+
+  // Load profile (check admin)
+  const prof = await supabase.from("profiles")
+    .select("is_admin")
+    .eq("id", currentUser.id)
+    .maybeSingle();
+
+  isAdmin = prof.data?.is_admin === true;
+
+  document.getElementById("auth-view").classList.add("hidden");
+  document.getElementById("app-view").classList.remove("hidden");
+
+  initMap();
+  loadMarkers();
+}
+
+// =========================
+//  SIGNUP / LOGIN / LOGOUT
+// =========================
+async function signUp() {
+  const email = document.getElementById("email_signup").value;
+  const password = document.getElementById("password_signup").value;
+
+  const { error } = await supabase.auth.signUp({ email, password });
+  if (error) return alert(error.message);
+
+  // Create profile
+  await supabase.from("profiles").insert({
+    id: (await supabase.auth.getUser()).data.user.id,
+    full_name: email,
+    is_admin: false
+  });
+
+  alert("Đăng ký thành công. Hãy kiểm tra email xác minh.");
+}
+
+async function signIn() {
+  const email = document.getElementById("email_login").value;
+  const password = document.getElementById("password_login").value;
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return alert(error.message);
+
+  checkLoginState();
+}
+
+async function logout() {
+  await supabase.auth.signOut();
+  location.reload();
+}
+
+// =========================
+//  INIT MAP
+// =========================
 function initMap() {
-  map = L.map("map").setView([11.9, 108.3], 10);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "© OpenStreetMap contributors",
-  }).addTo(map);
-  markersLayer.addTo(map);
-  map.on("click", function (e) {
-    $("m-lat").value = e.latlng.lat.toFixed(6);
-    $("m-lng").value = e.latlng.lng.toFixed(6);
-  });
-}
-window.clearMarkers = function () {
-  markersLayer.clearLayers();
-  markersById = {};
-  $("markers-list").innerHTML = "";
-};
+  map = L.map("map").setView([11.95, 108.45], 10);
 
-function escapeHtml(str) {
-  if (!str) return "";
-  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+  map.on("click", (e) => openAddForm(e.latlng));
 }
 
-async function addMarkerToMap(row) {
-  const id = row.id;
-  const lat = parseFloat(row.lat);
-  const lng = parseFloat(row.lng);
-  const m = L.marker([lat, lng]);
-  let html = `<b>${escapeHtml(row.name || "(no name)")}</b><div>Lat: ${lat}</div><div>Lng: ${lng}</div>`;
-  if (row.image_url) {
-    const signed = await getImageUrl(row.image_url).catch(()=>null);
-    if (signed) html += `<div style="margin-top:6px"><img src="${signed}" style="max-width:240px;display:block"/></div>`;
+// =========================
+//  OPEN ADD MARKER FORM
+// =========================
+function openAddForm(latlng) {
+  document.getElementById("lat").value = latlng.lat;
+  document.getElementById("lng").value = latlng.lng;
+  document.getElementById("add-modal").classList.remove("hidden");
+}
+
+function closeAddForm() {
+  document.getElementById("add-modal").classList.add("hidden");
+}
+
+// =========================
+//  UPLOAD IMAGE HANDLER
+// =========================
+async function uploadMarkerImage(userId, file, oldPath = null) {
+  if (!file) return { path: null, url: null };
+
+  // Delete old image if exists
+  if (oldPath) {
+    await supabase.storage.from("marker-images").remove([oldPath]);
   }
-  m.bindPopup(html);
-  m.addTo(markersLayer);
-  markersById[id] = m;
-}
 
-function renderMarkersList(rows) {
-  const c = $("markers-list");
-  c.innerHTML = "";
-  if (!rows || rows.length === 0) { c.innerHTML = '<div class="text-gray-500">Chưa có điểm nào</div>'; return; }
-  rows.forEach(r => {
-    const div = document.createElement("div");
-    div.className = "border p-2 rounded mb-2";
-    div.innerHTML = `<div class="font-medium">${escapeHtml(r.name||'(no name)')}</div>
-      <div class="text-sm">${Number(r.lat).toFixed(6)}, ${Number(r.lng).toFixed(6)}</div>
-      <div class="text-xs text-gray-600">${new Date(r.created_at).toLocaleString()}</div>
-      <div class="mt-2 flex gap-2">
-        <button data-id="${r.id}" class="btn-zoom bg-sky-500 text-white px-2 py-1 rounded text-sm">Zoom</button>
-        <button data-id="${r.id}" class="btn-delete bg-red-500 text-white px-2 py-1 rounded text-sm">Xoá</button>
-      </div>`;
-    c.appendChild(div);
-  });
-  c.querySelectorAll('.btn-zoom').forEach(b => b.addEventListener('click', ev=>{
-    const id = ev.target.dataset.id; const mk = markersById[id]; if (mk) map.setView(mk.getLatLng(),16);
-  }));
-  c.querySelectorAll('.btn-delete').forEach(b => b.addEventListener('click', async ev=>{
-    const id = ev.target.dataset.id;
-    if (!confirm('Xác nhận xóa?')) return;
-    const { error } = await supabase.from('markers').delete().eq('id', id);
-    if (error) return alert('Xóa lỗi: '+error.message);
-    const mk = markersById[id]; if (mk) markersLayer.removeLayer(mk); delete markersById[id];
-    ev.target.closest('div').remove();
-  }));
-}
+  const filename = `${Date.now()}.jpg`;
+  const path = `${userId}/${filename}`;
 
-// Load markers
-window.loadUserMarkers = async function() {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    console.log('[DEBUG] loadUserMarkers - session:', session);
-    if (!session) { console.warn('[DEBUG] no session in loadUserMarkers'); return; }
-    const uid = session.user.id;
-    clearMarkers();
-    const { data, error } = await supabase.from('markers').select('*').eq('user_id', uid).order('created_at',{ascending:false});
-    if (error) { console.error('[DEBUG] loadUserMarkers error', error); return; }
-    for (const r of data) await addMarkerToMap(r);
-    renderMarkersList(data);
-  } catch (e) {
-    console.error('[DEBUG] loadUserMarkers exception', e);
+  const { error } = await supabase.storage
+    .from("marker-images")
+    .upload(path, file);
+
+  if (error) {
+    console.error("Upload failed:", error);
+    throw error;
   }
-};
 
-// DEBUG: add marker flow with extensive logs
-$('btn-add-marker').addEventListener('click', async () => {
-  console.group('DEBUG add-marker flow');
+  const url = `${SUPABASE_URL}/storage/v1/object/public/marker-images/${path}`;
+  return { path, url };
+}
+
+// =========================
+//  CREATE MARKER
+// =========================
+async function saveMarker() {
   try {
-    console.log('[DEBUG] getSession BEFORE any action');
-    const { data: before } = await supabase.auth.getSession();
-    console.log('[DEBUG] session BEFORE:', before);
+    const lat = parseFloat(document.getElementById("lat").value);
+    const lng = parseFloat(document.getElementById("lng").value);
+    const name = document.getElementById("name").value;
+    const notes = document.getElementById("notes").value;
+    const is_public = document.getElementById("is_public").checked;
 
-    // also log getUser
-    try { const { data: userData } = await supabase.auth.getUser(); console.log('[DEBUG] getUser BEFORE:', userData); } catch(e){ console.warn('[DEBUG] getUser BEFORE failed', e); }
+    const file = document.getElementById("image").files[0];
 
-    if (!before || !before.session) {
-      console.warn('[DEBUG] no session BEFORE - aborting');
-      alert('Phiên làm việc không hợp lệ. Vui lòng đăng nhập lại.');
-      console.groupEnd();
-      return;
-    }
-    const uid = before.session.user.id; console.log('[DEBUG] uid BEFORE:', uid);
-
-    const name = $('m-name').value || '';
-    const lat = parseFloat($('m-lat').value);
-    const lng = parseFloat($('m-lng').value);
-    const notes = $('m-notes').value || '';
-    const file = $('m-image').files[0];
-
-    if (Number.isNaN(lat) || Number.isNaN(lng)) { alert('Lat/Lng không hợp lệ'); console.groupEnd(); return; }
-
-    let image_path = null;
+    let uploaded = { path: null, url: null };
     if (file) {
-      console.log('[DEBUG] Starting uploadImage', file.name);
-      // instrument upload
-      const start = Date.now();
-      try {
-        image_path = await (async () => {
-          console.log('[DEBUG] calling uploadImage with uid=', uid);
-          const res = await uploadImage(file, uid);
-          console.log('[DEBUG] uploadImage returned:', res);
-          return res;
-        })();
-      } catch (uErr) {
-        console.error('[DEBUG] uploadImage threw', uErr);
-        alert('Upload lỗi: ' + (uErr.message || uErr));
-        console.groupEnd();
-        return;
-      }
-      console.log('[DEBUG] upload finished in', Date.now()-start, 'ms; path=', image_path);
-
-      // log session after upload
-      const { data: afterUpload } = await supabase.auth.getSession();
-      console.log('[DEBUG] session AFTER upload:', afterUpload);
-      try { const { data: userAfter } = await supabase.auth.getUser(); console.log('[DEBUG] getUser AFTER upload:', userAfter); } catch(e){ console.warn('[DEBUG] getUser AFTER failed', e); }
-    } else {
-      console.log('[DEBUG] no file selected');
+      uploaded = await uploadMarkerImage(currentUser.id, file);
     }
 
-    // final session check before insert
-    const { data: sessBeforeInsert } = await supabase.auth.getSession();
-    console.log('[DEBUG] session BEFORE insert:', sessBeforeInsert);
-    if (!sessBeforeInsert || !sessBeforeInsert.session) {
-      console.warn('[DEBUG] session lost BEFORE insert - aborting');
-      alert('Phiên làm việc mất trước khi lưu, vui lòng đăng nhập lại.');
-      console.groupEnd();
-      return;
-    }
-    const payload = { lat, lng, name, notes, image_url: image_path };
-    console.log('[DEBUG] payload:', payload);
+    const { error } = await supabase.from("markers").insert({
+      user_id: currentUser.id,
+      lat, lng, name, notes,
+      is_public,
+      image_path: uploaded.path,
+      image_url: uploaded.url
+    });
 
-    const { data, error } = await supabase.from('markers').insert([payload]).select().single();
-    console.log('[DEBUG] insert result:', {data, error});
-    if (error) {
-      console.error('[DEBUG] INSERT ERROR', error);
-      alert('Lỗi khi thêm marker: ' + error.message);
-    } else {
-      alert('Thêm marker thành công');
-      // refresh
-      await loadUserMarkers();
-    }
+    if (error) throw error;
+
+    closeAddForm();
+    loadMarkers();
   } catch (err) {
-    console.error('[DEBUG] Unexpected error', err);
-    alert('Lỗi không lường trước: ' + (err.message||err));
-  } finally {
-    console.groupEnd();
+    alert("Lỗi khi lưu marker: " + err.message);
   }
-});
-
-// geolocate
-$('btn-geolocate').addEventListener('click', () => {
-  if (!navigator.geolocation) return alert('Trình duyệt không hỗ trợ geolocation');
-  navigator.geolocation.getCurrentPosition(pos => {
-    $('m-lat').value = pos.coords.latitude.toFixed(6);
-    $('m-lng').value = pos.coords.longitude.toFixed(6);
-  }, err => alert('Không lấy được vị trí: ' + err.message));
-});
-
-function setupRealtime() {
-  if (window._markers_channel) { try { window._markers_channel.unsubscribe(); } catch(e){} }
-  const channel = supabase.channel('public:markers')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'markers'}, async payload => {
-      // keep behavior same: only react for current user
-      const { data: { session } } = await supabase.auth.getSession();
-      const uid = session?.user?.id;
-      const ev = payload.eventType;
-      const recNew = payload.new, recOld = payload.old;
-      if (!uid) return;
-      if (recNew && recNew.user_id !== uid) return;
-      if (recOld && recOld.user_id !== uid) return;
-
-      if (ev === 'INSERT' && recNew) {
-        await addMarkerToMap(recNew);
-        const all = await supabase.from('markers').select('*').eq('user_id', uid).order('created_at', {ascending:false});
-        renderMarkersList(all.data);
-      } else if (ev === 'DELETE' && recOld) {
-        const id = recOld.id; const mk = markersById[id]; if (mk) markersLayer.removeLayer(mk); delete markersById[id];
-      } else if (ev === 'UPDATE') {
-        window.loadUserMarkers();
-      }
-    })
-    .subscribe();
-  window._markers_channel = channel;
 }
 
-initMap();
-setupRealtime();
+// =========================
+//  LOAD MARKERS
+// =========================
+async function loadMarkers() {
+  Object.values(markersOnMap).forEach(m => map.removeLayer(m));
+  markersOnMap = {};
+
+  let query = supabase.from("markers").select("*");
+
+  if (!isAdmin) {
+    query = query.or(`user_id.eq.${currentUser.id},is_public.eq.true`);
+  }
+
+  const { data, error } = await query;
+  if (error) return console.error(error);
+
+  data.forEach(addMarkerToMap);
+}
+
+// =========================
+//  RENDER MARKER
+// =========================
+function addMarkerToMap(m) {
+  const marker = L.marker([m.lat, m.lng], { draggable: true }).addTo(map);
+
+  const imgHtml = m.image_url
+    ? `<img src="${m.image_url}" width="150" class="rounded mb-2"/>`
+    : "";
+
+  const adminLabel = isAdmin ? `<div class="text-xs text-red-500">ADMIN VIEW</div>` : "";
+
+  const popup = `
+    ${imgHtml}
+    <b>${m.name}</b><br>
+    ${m.notes}<br>
+    <small>(${m.lat.toFixed(5)}, ${m.lng.toFixed(5)})</small><br>
+    <label>
+      <input type="checkbox" ${m.is_public ? "checked" : ""} onchange="togglePublic('${m.id}', this.checked)">
+      Công khai
+    </label>
+    <br><br>
+    <button onclick="openEdit('${m.id}')" class="bg-blue-500 text-white px-2 py-1 rounded">Sửa</button>
+    <button onclick="deleteMarker('${m.id}', '${m.image_path}')" class="bg-red-500 text-white px-2 py-1 rounded">Xóa</button>
+    ${adminLabel}
+  `;
+
+  marker.bindPopup(popup);
+
+  // Drag update
+  marker.on("dragend", async (e) => {
+    const p = e.target.getLatLng();
+    await supabase.from("markers")
+      .update({ lat: p.lat, lng: p.lng })
+      .eq("id", m.id);
+
+    loadMarkers();
+  });
+
+  markersOnMap[m.id] = marker;
+}
+
+// =========================
+//  DELETE MARKER
+// =========================
+async function deleteMarker(id, imagePath) {
+  if (!confirm("Xóa marker này?")) return;
+
+  if (imagePath) {
+    await supabase.storage.from("marker-images").remove([imagePath]);
+  }
+
+  await supabase.from("markers").delete().eq("id", id);
+  loadMarkers();
+}
+
+// =========================
+//  EDIT MARKER
+// =========================
+let editingMarkerId = null;
+
+function openEdit(id) {
+  editingMarkerId = id;
+  document.getElementById("edit-modal").classList.remove("hidden");
+}
+
+function closeEdit() {
+  editingMarkerId = null;
+  document.getElementById("edit-modal").classList.add("hidden");
+}
+
+async function saveEdit() {
+  try {
+    const name = document.getElementById("edit_name").value;
+    const notes = document.getElementById("edit_notes").value;
+    const file = document.getElementById("edit_image").files[0];
+
+    const { data: old } = await supabase
+      .from("markers")
+      .select("*")
+      .eq("id", editingMarkerId)
+      .single();
+
+    let uploaded = {
+      path: old.image_path,
+      url: old.image_url
+    };
+
+    if (file) {
+      uploaded = await uploadMarkerImage(currentUser.id, file, old.image_path);
+    }
+
+    await supabase.from("markers")
+      .update({
+        name,
+        notes,
+        image_path: uploaded.path,
+        image_url: uploaded.url
+      })
+      .eq("id", editingMarkerId);
+
+    closeEdit();
+    loadMarkers();
+  } catch (err) {
+    alert("Lỗi khi cập nhật: " + err.message);
+  }
+}
+
+// =========================
+//  TOGGLE PUBLIC
+// =========================
+async function togglePublic(id, value) {
+  await supabase.from("markers").update({ is_public: value }).eq("id", id);
+}
+
+// =========================
+//  SEARCH MARKERS
+// =========================
+function searchMarkers() {
+  const keyword = document.getElementById("search").value.toLowerCase();
+
+  Object.entries(markersOnMap).forEach(([id, m]) => {
+    const mk = m._popup?._content?.toLowerCase() || "";
+    if (mk.includes(keyword)) map.addLayer(m);
+    else map.removeLayer(m);
+  });
+}
