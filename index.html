@@ -1,93 +1,126 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <title>Map Project</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Map Project — Dashboard</title>
+
+  <!-- Tailwind (dev) -->
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    html,body,#app { height: 100%; margin:0; }
+    #map { height: calc(100vh - 64px); }
+    .modal-backdrop { background: rgba(0,0,0,0.45); }
+  </style>
 </head>
+<body class="bg-slate-50" id="app">
 
-<body class="bg-gray-100">
-
-  <!-- AUTH VIEW -->
-  <div id="auth-view" class="p-6">
-    <h1 class="text-2xl mb-4 font-bold">Đăng nhập / Đăng ký</h1>
-
-    <div class="mb-4">
-      <input id="email_login" class="border p-2" placeholder="Email" />
-      <input id="password_login" type="password" class="border p-2" placeholder="Mật khẩu" />
-      <button onclick="signIn()" class="bg-blue-500 text-white px-3 py-2">Đăng nhập</button>
+  <!-- Navigation -->
+  <header class="bg-white shadow px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="text-xl font-bold">MapProject</div>
+      <div class="text-sm text-gray-600">Quản lý markers & ảnh</div>
     </div>
 
-    <div>
-      <input id="email_signup" class="border p-2" placeholder="Email" />
-      <input id="password_signup" type="password" class="border p-2" placeholder="Mật khẩu" />
-      <button onclick="signUp()" class="bg-green-500 text-white px-3 py-2">Đăng ký</button>
+    <div class="flex items-center gap-4">
+      <div id="user-name" class="text-sm text-gray-700 hidden"></div>
+      <button id="btn-open-add" class="bg-emerald-500 text-white px-3 py-1 rounded">Thêm marker</button>
+      <button id="btn-logout-top" class="bg-red-500 text-white px-3 py-1 rounded hidden">Đăng xuất</button>
     </div>
-  </div>
+  </header>
 
-  <!-- APP VIEW -->
-  <div id="app-view" class="hidden h-screen flex flex-col">
+  <main class="flex">
+    <!-- Left panel -->
+    <aside class="w-96 bg-white p-4 border-r h-full">
+      <div class="mb-3">
+        <label class="text-sm font-medium">Tìm kiếm</label>
+        <div class="flex gap-2 mt-2">
+          <input id="search-q" class="flex-1 border px-2 py-1" placeholder="Tên hoặc ghi chú..." />
+          <button id="btn-search" class="bg-indigo-600 text-white px-3 py-1 rounded">Tìm</button>
+        </div>
+        <button id="btn-clear-search" class="mt-2 text-xs text-gray-500 underline">Xóa tìm kiếm</button>
+      </div>
 
-    <div class="p-3 bg-white shadow flex items-center gap-4">
-      <button onclick="logout()" class="bg-red-600 text-white px-3 py-2 rounded">Đăng xuất</button>
+      <div class="mb-3">
+        <h4 class="font-medium">Danh sách điểm</h4>
+        <div id="markers-list" class="mt-2 text-sm overflow-auto" style="max-height:60vh"></div>
+      </div>
 
-      <input id="search"
-             class="border p-2 flex-1 max-w-lg"
-             placeholder="Tìm kiếm marker..."
-             oninput="searchMarkers()">
+      <div id="admin-panel" class="hidden mt-4 p-2 bg-yellow-50 rounded">
+        <div class="flex justify-between items-center">
+          <div class="text-sm font-medium">Admin Panel</div>
+          <button id="btn-refresh-all" class="bg-orange-500 text-white px-2 py-1 rounded text-sm">Tải tất cả</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Map -->
+    <div class="flex-1">
+      <div id="map"></div>
     </div>
+  </main>
 
-    <div id="map" class="flex-1"></div>
-  </div>
+  <!-- ADD MODAL -->
+  <div id="add-modal" class="hidden fixed inset-0 flex items-center justify-center modal-backdrop z-50">
+    <div class="bg-white rounded shadow p-4 w-96">
+      <h3 class="font-semibold mb-2">Thêm marker</h3>
+      <label class="text-xs text-gray-600">Tên</label>
+      <input id="m-name" class="w-full border px-2 py-1 mb-2" />
+      <label class="text-xs text-gray-600">Lat, Lng</label>
+      <div class="flex gap-2 mb-2">
+        <input id="m-lat" class="flex-1 border px-2 py-1" placeholder="Vĩ độ" />
+        <input id="m-lng" class="flex-1 border px-2 py-1" placeholder="Kinh độ" />
+      </div>
+      <label class="text-xs text-gray-600">Ghi chú</label>
+      <textarea id="m-notes" class="w-full border px-2 py-1 mb-2"></textarea>
+      <label class="text-xs text-gray-600">Ảnh (tùy chọn)</label>
+      <input id="m-image" type="file" accept="image/*" class="mb-2" />
+      <label class="flex items-center gap-2 text-sm mb-3"><input id="m-is-public" type="checkbox" /> Công khai</label>
 
-  <!-- ADD MARKER MODAL -->
-  <div id="add-modal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
-    <div class="bg-white p-6 rounded shadow w-80">
-      <h2 class="text-lg font-bold mb-3">Thêm Marker</h2>
-
-      <input id="lat" class="border p-2 w-full mb-2" placeholder="Lat">
-      <input id="lng" class="border p-2 w-full mb-2" placeholder="Lng">
-
-      <input id="name" class="border p-2 w-full mb-2" placeholder="Tên điểm">
-      <textarea id="notes" class="border p-2 w-full mb-2" placeholder="Ghi chú"></textarea>
-
-      <label class="flex items-center gap-2 mb-3">
-        <input type="checkbox" id="is_public">
-        Công khai
-      </label>
-
-      <input id="image" type="file" accept="image/*" class="mb-3">
-
-      <div class="flex justify-between">
-        <button onclick="closeAddForm()" class="px-3 py-2 bg-gray-400 text-white">Hủy</button>
-        <button onclick="saveMarker()" class="px-3 py-2 bg-blue-600 text-white">Lưu</button>
+      <div class="flex justify-end gap-2">
+        <button id="btn-cancel-add" class="px-3 py-1 rounded bg-gray-200">Hủy</button>
+        <button id="btn-save-add" class="px-3 py-1 rounded bg-emerald-600 text-white">Lưu</button>
       </div>
     </div>
   </div>
 
   <!-- EDIT MODAL -->
-  <div id="edit-modal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
-    <div class="bg-white p-6 rounded shadow w-80">
-      <h2 class="text-lg font-bold mb-3">Sửa Marker</h2>
-
-      <input id="edit_name" class="border p-2 w-full mb-2" placeholder="Tên điểm">
-      <textarea id="edit_notes" class="border p-2 w-full mb-2" placeholder="Ghi chú"></textarea>
-      <input id="edit_image" type="file" accept="image/*" class="mb-3">
+  <div id="edit-modal" class="hidden fixed inset-0 flex items-center justify-center modal-backdrop z-50">
+    <div class="bg-white rounded shadow p-4 w-96">
+      <h3 class="font-semibold mb-2">Sửa marker</h3>
+      <label class="text-xs text-gray-600">Tên</label>
+      <input id="e-name" class="w-full border px-2 py-1 mb-2" />
+      <label class="text-xs text-gray-600">Ghi chú</label>
+      <textarea id="e-notes" class="w-full border px-2 py-1 mb-2"></textarea>
+      <label class="text-xs text-gray-600">Ảnh mới (tùy chọn)</label>
+      <input id="e-image" type="file" accept="image/*" class="mb-2" />
+      <div class="flex items-center gap-2 mb-3">
+        <label class="flex items-center gap-2"><input id="e-is-public" type="checkbox" /> Công khai</label>
+        <div class="text-xs text-gray-500 ml-auto">Kéo để di chuyển chỉ bật khi sửa</div>
+      </div>
 
       <div class="flex justify-between">
-        <button onclick="closeEdit()" class="px-3 py-2 bg-gray-400 text-white">Hủy</button>
-        <button onclick="saveEdit()" class="px-3 py-2 bg-blue-600 text-white">Cập nhật</button>
+        <button id="btn-cancel-edit" class="px-3 py-1 rounded bg-gray-200">Hủy</button>
+        <div class="flex gap-2">
+          <button id="btn-confirm-move" class="px-3 py-1 rounded bg-yellow-400 hidden">Đồng ý cập nhật vị trí</button>
+          <button id="btn-save-edit" class="px-3 py-1 rounded bg-blue-600 text-white">Lưu</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- SCRIPTS -->
+  <!-- libs -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Supabase UMD must be loaded BEFORE supabase.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
+
+  <!-- project scripts -->
   <script src="supabase.js"></script>
   <script src="upload.js"></script>
   <script src="app.js"></script>
-
 </body>
 </html>
