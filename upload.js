@@ -1,15 +1,16 @@
 // UPLOAD ẢNH + XÓA ẢNH CŨ
 window.uploadImage = async function(markerId, newFile, oldPath) {
   try {
-    const folder = `marker-images/${markerId}`;
-    const fileName = `${Date.now()}.jpg`;
+    const folder = `${markerId}`;  // Không cần "marker-images/" vì bucket là marker-images
+    const fileName = `${Date.now()}.${newFile.name.split('.').pop()}`;
     const filePath = `${folder}/${fileName}`;
 
     // Xóa ảnh cũ nếu có
     if (oldPath) {
-      await supabase.storage
+      const { error: deleteErr } = await supabase.storage
         .from("marker-images")
         .remove([oldPath]);
+      if (deleteErr) console.error("Xóa ảnh cũ lỗi:", deleteErr);
     }
 
     // Upload file mới
@@ -21,8 +22,8 @@ window.uploadImage = async function(markerId, newFile, oldPath) {
       });
 
     if (uploadErr) {
-      console.error("Upload error", uploadErr);
-      return null;
+      console.error("Upload error:", uploadErr);
+      throw uploadErr;
     }
 
     // Lấy URL public
@@ -35,7 +36,8 @@ window.uploadImage = async function(markerId, newFile, oldPath) {
       path: filePath
     };
   } catch (err) {
-    console.error("UploadImage failed", err);
+    console.error("UploadImage failed:", err);
+    alert("Lỗi upload ảnh: " + (err.message || "Không xác định"));
     return null;
   }
 };
