@@ -63,10 +63,12 @@ async function loadMarkers() {
   const { data, error } = await supabase
     .from("markers")
     .select("*")
+    .or(`user_id.eq.${currentUser.id},is_public.eq.true`)
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Load marker lỗi", error);
+    console.error("Load marker lỗi:", error);
+    alert("Lỗi load markers: " + error.message);
     return;
   }
 
@@ -74,7 +76,7 @@ async function loadMarkers() {
     const marker = L.marker([m.lat, m.lng]).addTo(markersLayer);
 
     let img = m.image_url
-      ? `<img src="${m.image_url}" class="w-full mb-2 rounded" />`
+      ? `<img src="${m.image_url}" class="w-full mb-2 rounded max-h-48 object-cover" alt="Ảnh marker" />`
       : "";
 
     let editBtn = "";
@@ -110,16 +112,18 @@ saveBtn.onclick = async () => {
   if (!name) return alert("Nhập tên!");
 
   let newImage = null;
+  let markerId = editingMode ? markerBeingEdited.id : crypto.randomUUID();  // Generate ID trước nếu add new
 
   // ========================
   // UPLOAD ẢNH NẾU CÓ
   // ========================
   if (file) {
     newImage = await uploadImage(
-      markerBeingEdited?.id || crypto.randomUUID(),
+      markerId,
       file,
-      markerBeingEdited?.image_path || null
+      editingMode ? markerBeingEdited.image_path : null
     );
+    if (!newImage) return;  // Nếu upload fail, dừng
   }
 
   // ========================
@@ -128,6 +132,7 @@ saveBtn.onclick = async () => {
   if (!editingMode) {
     const { error } = await supabase.from("markers").insert([
       {
+        id: markerId,  // Insert với ID đã generate
         user_id: currentUser.id,
         name,
         notes,
@@ -140,8 +145,12 @@ saveBtn.onclick = async () => {
     ]);
 
     if (error) {
-      console.error(error);
+      console.error("Insert error:", error);
       alert("Lỗi thêm marker: " + error.message);
+      // Rollback ảnh nếu fail
+      if (newImage?.path) {
+        await supabase.storage.from("marker-images").remove([newImage.path]);
+      }
       return;
     }
   }
@@ -150,20 +159,32 @@ saveBtn.onclick = async () => {
   // SỬA MARKER
   // ========================
   else {
+    const updates = {
+      name,
+      notes,
+      is_public,
+    };
+    if (newImage) {
+      updates.image_url = newImage.url;
+      updates.image_path = newImage.path;
+    }
+    if (tempLat && tempLng) {  // Nếu drag, update vị trí
+      updates.lat = tempLat;
+      updates.lng = tempLng;
+    }
+
     const { error } = await supabase
       .from("markers")
-      .update({
-        name,
-        notes,
-        is_public,
-        image_url: newImage?.url || markerBeingEdited.image_url,
-        image_path: newImage?.path || markerBeingEdited.image_path,
-      })
-      .eq("id", markerBeingEdited.id);
+      .update(updates)
+      .eq("id", markerId);
 
     if (error) {
-      console.error(error);
+      console.error("Update error:", error);
       alert("Lỗi sửa marker: " + error.message);
+      // Rollback ảnh mới nếu fail
+      if (newImage?.path) {
+        await supabase.storage.from("marker-images").remove([newImage.path]);
+      }
       return;
     }
   }
@@ -184,7 +205,7 @@ window.editMarker = async function (id) {
     .eq("id", id)
     .single();
 
-  if (error) return alert("Không tải được marker!");
+  if (error) return alert("Không tải được marker: " + error.message);
 
   markerBeingEdited = data;
 
@@ -222,10 +243,17 @@ function enableMarkerDrag(markerId) {
 window.deleteMarker = async function (id) {
   if (!confirm("Xóa marker này?")) return;
 
+  // Lấy image_path trước
+  const { data: marker } = await supabase.from("markers").select("image_path").eq("id", id).single();
+  if (marker?.image_path) {
+    const { error: deleteImgErr } = await supabase.storage.from("marker-images").remove([marker.image_path]);
+    if (deleteImgErr) console.error("Xóa ảnh lỗi:", deleteImgErr);
+  }
+
   const { error } = await supabase.from("markers").delete().eq("id", id);
 
   if (error) {
-    alert("Không xóa được!");
+    alert("Không xóa được: " + error.message);
     return;
   }
 
@@ -241,6 +269,7 @@ cancelBtn.onclick = () => closeModal();
 //  BUTTON ADD MARKER
 // =========================================================
 addBtn.onclick = () => {
+  if (!currentUser) return alert("Đăng nhập trước!");
   editingMode = false;
   tempLat = null;
   tempLng = null;
@@ -254,16 +283,29 @@ document.getElementById("searchBtn").onclick = async () => {
   const q = document.getElementById("searchInput").value.trim();
   if (!q) return loadMarkers();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("markers")
     .select("*")
-    .or(`name.ilike.%${q}%,notes.ilike.%${q}%`);
+    .or(`name.ilike.%${q}%,notes.ilike.%${q}%`)
+    .or(`user_id.eq.${currentUser.id},is_public.eq.true`);
+
+  if (error) {
+    console.error("Search error:", error);
+    return;
+  }
 
   markersLayer.clearLayers();
 
   data.forEach((m) => {
-    L.marker([m.lat, m.lng]).addTo(markersLayer)
-      .bindPopup(`<b>${m.name}</b><br>${m.notes}`);
+    const marker = L.marker([m.lat, m.lng]).addTo(markersLayer);
+
+    let img = m.image_url ? `<img src="${m.image_url}" class="w-full mb-2 rounded" alt="Ảnh marker" />` : "";
+
+    marker.bindPopup(`
+      <b>${m.name || "Không tên"}</b><br>
+      ${img}
+      ${m.notes || ""}
+    `);
   });
 };
 
@@ -279,7 +321,7 @@ document.getElementById("signInBtn").onclick = async () => {
     password: pass,
   });
 
-  if (error) return alert("Sai thông tin đăng nhập!");
+  if (error) return alert("Sai thông tin đăng nhập: " + error.message);
 
   location.reload();
 };
@@ -290,7 +332,7 @@ document.getElementById("signUpBtn").onclick = async () => {
 
   const { error } = await supabase.auth.signUp({ email, password: pass });
 
-  if (error) return alert("Lỗi đăng ký!");
+  if (error) return alert("Lỗi đăng ký: " + error.message);
 
   alert("Đăng ký thành công! Đăng nhập lại.");
 };
