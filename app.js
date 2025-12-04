@@ -1,13 +1,4 @@
 // =========================
-//  INIT SUPABASE CLIENT
-// =========================
-const SUPABASE_URL = "https://nhzkktsnsaclwwchzdkc.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR_ANON_KEY_HERE";
-window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: true, storage: window.localStorage }
-});
-
-// =========================
 //  GLOBAL
 // =========================
 let map;
