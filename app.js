@@ -129,34 +129,38 @@ window.loadUserMarkers = async function(){
 
 // Add marker (Cách 1: không gửi user_id)
 $('btn-add-marker').addEventListener('click', async () => {
-  if (!window.currentUser) return alert('Bạn cần đăng nhập');
-  const name = $('m-name').value || '';
-  const lat = parseFloat($('m-lat').value);
-  const lng = parseFloat($('m-lng').value);
-  const notes = $('m-notes').value || '';
-  const file = $('m-image').files[0];
+// Lấy session trực tiếp từ Supabase (đảm bảo không bị mất)
+const {
+  data: { session }
+} = await supabase.auth.getSession();
 
-  if (Number.isNaN(lat) || Number.isNaN(lng)) return alert('Lat/Lng không hợp lệ');
+if (!session || !session.user) {
+  return alert("Bạn cần đăng nhập lại.");
+}
 
-  try {
-    let image_path = null;
-    if (file) {
-      image_path = await uploadImage(file, window.currentUser.id);
-    }
+const uid = session.user.id;
 
-    const payload = {
+// Upload ảnh trước
+let image_path = null;
+if (file) {
+  image_path = await uploadImage(file, uid);
+}
+
+// INSERT mà không cần user_id (vì default auth.uid())
+const { data, error } = await supabase
+  .from("markers")
+  .insert([
+    {
       lat,
       lng,
       name,
       notes,
       image_url: image_path
-    };
+    }
+  ])
+  .select()
+  .single();
 
-    const { data, error } = await supabase
-      .from('markers')
-      .insert([payload])
-      .select()
-      .single();
 
     if (error) throw error;
 
