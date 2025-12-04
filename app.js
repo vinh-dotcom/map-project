@@ -37,6 +37,7 @@ function closeModal() {
 //  INIT MAP
 // =========================================================
 function initMap() {
+  console.log("Initializing map...");
   map = L.map("map").setView([11.94, 108.44], 10);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -58,6 +59,7 @@ function initMap() {
 //  LOAD MARKERS
 // =========================================================
 async function loadMarkers() {
+  console.log("Loading markers for user:", currentUser?.id);
   markersLayer.clearLayers();
 
   const { data, error } = await supabase
@@ -104,6 +106,7 @@ async function loadMarkers() {
 //  SAVE MARKER (CREATE OR UPDATE)
 // =========================================================
 saveBtn.onclick = async () => {
+  console.log("Saving marker...", editingMode ? "Edit mode" : "Add mode");
   const name = document.getElementById("markerName").value.trim();
   const notes = document.getElementById("markerNotes").value.trim();
   const is_public = document.getElementById("markerPublic").checked;
@@ -118,6 +121,7 @@ saveBtn.onclick = async () => {
   // UPLOAD ẢNH NẾU CÓ
   // ========================
   if (file) {
+    console.log("Uploading image...");
     newImage = await uploadImage(
       markerId,
       file,
@@ -130,6 +134,7 @@ saveBtn.onclick = async () => {
   // THÊM MARKER
   // ========================
   if (!editingMode) {
+    console.log("Inserting new marker with ID:", markerId);
     const { error } = await supabase.from("markers").insert([
       {
         id: markerId,  // Insert với ID đã generate
@@ -173,6 +178,7 @@ saveBtn.onclick = async () => {
       updates.lng = tempLng;
     }
 
+    console.log("Updating marker ID:", markerId);
     const { error } = await supabase
       .from("markers")
       .update(updates)
@@ -197,6 +203,7 @@ saveBtn.onclick = async () => {
 //  EDIT MARKER
 // =========================================================
 window.editMarker = async function (id) {
+  console.log("Editing marker ID:", id);
   editingMode = true;
 
   const { data, error } = await supabase
@@ -232,6 +239,7 @@ function enableMarkerDrag(markerId) {
       m.on("dragend", (e) => {
         tempLat = e.target.getLatLng().lat;
         tempLng = e.target.getLatLng().lng;
+        console.log("New position after drag:", tempLat, tempLng);
       });
     }
   });
@@ -242,6 +250,8 @@ function enableMarkerDrag(markerId) {
 // =========================================================
 window.deleteMarker = async function (id) {
   if (!confirm("Xóa marker này?")) return;
+
+  console.log("Deleting marker ID:", id);
 
   // Lấy image_path trước
   const { data: marker } = await supabase.from("markers").select("image_path").eq("id", id).single();
@@ -283,6 +293,8 @@ document.getElementById("searchBtn").onclick = async () => {
   const q = document.getElementById("searchInput").value.trim();
   if (!q) return loadMarkers();
 
+  console.log("Searching for:", q);
+
   const { data, error } = await supabase
     .from("markers")
     .select("*")
@@ -316,6 +328,8 @@ document.getElementById("signInBtn").onclick = async () => {
   const email = document.getElementById("authEmail").value;
   const pass = document.getElementById("authPassword").value;
 
+  console.log("Signing in with email:", email);
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password: pass,
@@ -330,6 +344,8 @@ document.getElementById("signUpBtn").onclick = async () => {
   const email = document.getElementById("authEmail").value;
   const pass = document.getElementById("authPassword").value;
 
+  console.log("Signing up with email:", email);
+
   const { error } = await supabase.auth.signUp({ email, password: pass });
 
   if (error) return alert("Lỗi đăng ký: " + error.message);
@@ -338,6 +354,7 @@ document.getElementById("signUpBtn").onclick = async () => {
 };
 
 document.getElementById("logoutBtn").onclick = async () => {
+  console.log("Logging out...");
   await supabase.auth.signOut();
   location.reload();
 };
@@ -346,16 +363,26 @@ document.getElementById("logoutBtn").onclick = async () => {
 //  CHECK SESSION
 // =========================================================
 (async () => {
+  console.log("Checking session...");
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
+  console.log("Session data:", session);  // Debug: Xem session có null không
+
   if (!session) {
-    document.getElementById("authModal").classList.remove("hidden");
+    console.log("No session, showing auth modal");
+    const authModal = document.getElementById("authModal");
+    if (authModal) {
+      authModal.classList.remove("hidden");
+    } else {
+      console.error("authModal element not found!");
+    }
     return;
   }
 
   currentUser = session.user;
+  console.log("User logged in:", currentUser.email);
 
   document.getElementById("authModal").classList.add("hidden");
   document.getElementById("userArea").classList.remove("hidden");
