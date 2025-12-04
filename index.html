@@ -1,94 +1,93 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
   <title>Map Project</title>
-
-  <!-- Tailwind (dev) -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-
-  <style>
-    html,body { height:100%; margin:0; }
-    #map { height: 70vh; min-height: 360px; }
-    .sidebar { height: 70vh; overflow:auto; }
-  </style>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
-<body class="bg-slate-50">
-  <div class="max-w-6xl mx-auto p-4">
-    <div class="flex gap-4">
-      <!-- LEFT PANEL -->
-      <div class="w-96 bg-white rounded shadow p-4">
-        <h2 class="text-xl font-semibold mb-2">Map Markers</h2>
+<body class="bg-gray-100">
 
-        <!-- Auth panel -->
-        <div id="auth-panel" class="mb-4">
-          <div id="signed-out">
-            <input id="email" placeholder="Email" class="w-full border px-2 py-1 mb-2" />
-            <input id="password" type="password" placeholder="Password" class="w-full border px-2 py-1 mb-2" />
-            <div class="flex gap-2">
-              <button id="btn-signup" class="bg-blue-600 text-white px-3 py-1 rounded">Đăng ký</button>
-              <button id="btn-login"  class="bg-green-600 text-white px-3 py-1 rounded">Đăng nhập</button>
-            </div>
-          </div>
+  <!-- AUTH VIEW -->
+  <div id="auth-view" class="p-6">
+    <h1 class="text-2xl mb-4 font-bold">Đăng nhập / Đăng ký</h1>
 
-          <div id="signed-in" class="hidden">
-            <div>Xin chào: <span id="user-email" class="font-medium"></span></div>
-            <div class="mt-2">
-              <button id="btn-logout" class="bg-red-500 text-white px-3 py-1 rounded">Đăng xuất</button>
-            </div>
-          </div>
-        </div>
+    <div class="mb-4">
+      <input id="email_login" class="border p-2" placeholder="Email" />
+      <input id="password_login" type="password" class="border p-2" placeholder="Mật khẩu" />
+      <button onclick="signIn()" class="bg-blue-500 text-white px-3 py-2">Đăng nhập</button>
+    </div>
 
-        <!-- Marker Form -->
-        <div id="marker-form" class="mb-4 hidden">
-          <h3 class="font-medium">Thêm marker</h3>
-          <input id="m-name" placeholder="Tên địa điểm" class="w-full border px-2 py-1 mb-2" />
-          <div class="flex gap-2 mb-2">
-            <input id="m-lat" placeholder="Vĩ độ (lat)" class="flex-1 border px-2 py-1" />
-            <input id="m-lng" placeholder="Kinh độ (lng)" class="flex-1 border px-2 py-1" />
-          </div>
-          <textarea id="m-notes" placeholder="Ghi chú" class="w-full border px-2 py-1 mb-2"></textarea>
-          <input id="m-image" type="file" accept="image/*" class="mb-2" />
-          <div class="flex gap-2">
-            <button id="btn-add-marker" class="bg-blue-600 text-white px-3 py-1 rounded">Thêm</button>
-            <button id="btn-geolocate" class="bg-slate-500 text-white px-3 py-1 rounded">Dùng vị trí</button>
-          </div>
-        </div>
+    <div>
+      <input id="email_signup" class="border p-2" placeholder="Email" />
+      <input id="password_signup" type="password" class="border p-2" placeholder="Mật khẩu" />
+      <button onclick="signUp()" class="bg-green-500 text-white px-3 py-2">Đăng ký</button>
+    </div>
+  </div>
 
-        <!-- Marker list -->
-        <div class="mt-4">
-          <h3 class="font-medium mb-2">Danh sách điểm</h3>
-          <div id="markers-list" class="sidebar text-sm"></div>
-        </div>
-      </div>
+  <!-- APP VIEW -->
+  <div id="app-view" class="hidden h-screen flex flex-col">
 
-      <!-- MAP -->
-      <div class="flex-1 bg-white rounded shadow p-4">
-        <div id="map" class="rounded"></div>
+    <div class="p-3 bg-white shadow flex items-center gap-4">
+      <button onclick="logout()" class="bg-red-600 text-white px-3 py-2 rounded">Đăng xuất</button>
+
+      <input id="search"
+             class="border p-2 flex-1 max-w-lg"
+             placeholder="Tìm kiếm marker..."
+             oninput="searchMarkers()">
+    </div>
+
+    <div id="map" class="flex-1"></div>
+  </div>
+
+  <!-- ADD MARKER MODAL -->
+  <div id="add-modal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
+    <div class="bg-white p-6 rounded shadow w-80">
+      <h2 class="text-lg font-bold mb-3">Thêm Marker</h2>
+
+      <input id="lat" class="border p-2 w-full mb-2" placeholder="Lat">
+      <input id="lng" class="border p-2 w-full mb-2" placeholder="Lng">
+
+      <input id="name" class="border p-2 w-full mb-2" placeholder="Tên điểm">
+      <textarea id="notes" class="border p-2 w-full mb-2" placeholder="Ghi chú"></textarea>
+
+      <label class="flex items-center gap-2 mb-3">
+        <input type="checkbox" id="is_public">
+        Công khai
+      </label>
+
+      <input id="image" type="file" accept="image/*" class="mb-3">
+
+      <div class="flex justify-between">
+        <button onclick="closeAddForm()" class="px-3 py-2 bg-gray-400 text-white">Hủy</button>
+        <button onclick="saveMarker()" class="px-3 py-2 bg-blue-600 text-white">Lưu</button>
       </div>
     </div>
   </div>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- EDIT MODAL -->
+  <div id="edit-modal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
+    <div class="bg-white p-6 rounded shadow w-80">
+      <h2 class="text-lg font-bold mb-3">Sửa Marker</h2>
 
-  <!-- Supabase UMD (correct CDN; required before supabase.js) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
+      <input id="edit_name" class="border p-2 w-full mb-2" placeholder="Tên điểm">
+      <textarea id="edit_notes" class="border p-2 w-full mb-2" placeholder="Ghi chú"></textarea>
+      <input id="edit_image" type="file" accept="image/*" class="mb-3">
 
-  <!-- Small DOM helper (define $ once) -->
-  <script>
-    window.$ = id => document.getElementById(id);
-  </script>
+      <div class="flex justify-between">
+        <button onclick="closeEdit()" class="px-3 py-2 bg-gray-400 text-white">Hủy</button>
+        <button onclick="saveEdit()" class="px-3 py-2 bg-blue-600 text-white">Cập nhật</button>
+      </div>
+    </div>
+  </div>
 
-  <!-- Project scripts -->
+  <!-- SCRIPTS -->
   <script src="supabase.js"></script>
-  <script src="auth.js"></script>
   <script src="upload.js"></script>
   <script src="app.js"></script>
+
 </body>
 </html>
