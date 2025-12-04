@@ -1,26 +1,47 @@
-// Upload image for markers — with delete old file
+// upload.js
+// uploadImage(userId, file, oldPath) -> { path, publicUrl }
+// Uses supabase.storage.from('marker-images')
 async function uploadImage(userId, file, oldPath = null) {
-  if (!file) return { path: null, url: null };
+  if (!file) return { path: null, publicUrl: null };
 
-  // Delete old file first
-  if (oldPath) {
-    console.log("Deleting old file:", oldPath);
-    await supabase.storage.from("marker-images").remove([oldPath]);
+  try {
+    // delete old if exists
+    if (oldPath) {
+      try {
+        await supabase.storage.from('marker-images').remove([oldPath]);
+      } catch (e) {
+        console.warn('Could not remove old image', e);
+      }
+    }
+
+    const ext = (file.name || '').split('.').pop();
+    const filename = `${Date.now()}.${ext}`;
+    const path = `${userId}/${filename}`;
+
+    const { data, error } = await supabase.storage
+      .from('marker-images')
+      .upload(path, file, { cacheControl: '3600', upsert: false });
+
+    if (error) {
+      console.error('Upload error', error);
+      throw error;
+    }
+
+    // obtain public URL (works if bucket is public or you set public policy)
+    const { data: pub } = await supabase.storage.from('marker-images').getPublicUrl(path);
+    const publicUrl = pub?.publicUrl || null;
+
+    return { path, publicUrl };
+  } catch (err) {
+    console.error('uploadImage failed', err);
+    throw err;
   }
+}
 
-  const filename = `${Date.now()}.jpg`;
-  const path = `${userId}/${filename}`;
-
-  const { error } = await supabase.storage
-    .from("marker-images")
-    .upload(path, file);
-
-  if (error) {
-    console.error("Upload error", error);
-    throw error;
-  }
-
-  const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/marker-images/${path}`;
-
-  return { path, url: publicUrl };
+// helper to get public url from either image_url or image_path
+async function resolveImagePublicUrl(image_url, image_path) {
+  if (image_url) return image_url;
+  if (!image_path) return null;
+  const { data: pub } = await supabase.storage.from('marker-images').getPublicUrl(image_path);
+  return pub?.publicUrl || null;
 }
